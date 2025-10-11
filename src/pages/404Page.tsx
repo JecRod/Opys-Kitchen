@@ -1,15 +1,14 @@
+// 404Page.tsx
+import { Link } from "react-router-dom";
 
-
-
-const NoPage = () => {
-  reRenderScript();
-
-  return <h1>404</h1>;
-};
-
-export default NoPage;
-function reRenderScript() {
-    throw new Error("Function not implemented.");
-    
+export default function NoPage() {
+  return (
+    <div style={{ textAlign: "center", marginTop: "100px" }}>
+      <h1>404 - Page Not Found</h1>
+      <p>The page you are looking for does not exist.</p>
+      <Link to="/" style={{ color: "#667eea", fontWeight: "bold" }}>
+        Go Home
+      </Link>
+    </div>
+  );
 }
-

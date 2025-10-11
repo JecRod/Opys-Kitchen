@@ -4,6 +4,9 @@ export const API_CONFIG = {
     ENDPOINTS: {
         MENU: '/items',
         ORDER: '/orders',
+        HALLS: '/halls',
+        OFFERS: '/offers',
+        BOT: '/chat/reply',
 
 
     }

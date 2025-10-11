@@ -2,10 +2,25 @@ import axios from "axios";
 import { API_CONFIG } from "../Api-Config";
 import { useCart } from "../context/CartContext";
 import toast from "react-hot-toast";
-import { useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 
 export default function ContentCheckout() {
   const { cartItems, clearCart } = useCart();
+
+  // ✅ Load checkout method (delivery / pickup) from localStorage
+  const [checkoutMethod, setCheckoutMethod] = useState<"delivery" | "dine-in" | null>(null);
+
+  useEffect(() => {
+  const savedMethod = localStorage.getItem("checkout_method") as "delivery" | "dine-in" | null;
+  if (savedMethod) {
+    setCheckoutMethod(savedMethod);
+    setFormData((prev) => ({
+      ...prev,
+      orderType: savedMethod === "dine-in" ? "dine-in" : "delivery", // ✅ map pickup -> dine-in
+    }));
+  }
+}, []);
+
 
   // ✅ Form state
   const [formData, setFormData] = useState({
@@ -15,18 +30,15 @@ export default function ContentCheckout() {
     tableNo: "",
     address: "",
     payment: "cash",
-    orderType: "dine-in", // 👈 new field
+    orderType: "dine-in", // default
   });
 
   // ✅ Calculate totals
-  const subtotal = cartItems.reduce(
-    (total, item) => total + item.price * item.quantity,
-    0
-  );
+  const subtotal = cartItems.reduce((total, item) => total + item.price * item.quantity, 0);
   const tax = subtotal * 0.06;
   const total = subtotal + tax;
 
-  // ✅ Handle input changes
+  // ✅ Handle input change
   const handleChange = (
     e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
@@ -43,7 +55,7 @@ export default function ContentCheckout() {
       return;
     }
 
-    // ✅ Build payload conditionally
+    // Build payload
     const payload: any = {
       customer_name: formData.name,
       customer_email: formData.email,
@@ -63,12 +75,42 @@ export default function ContentCheckout() {
       payload.address = formData.address;
     }
 
+    // ✅ Online payment flow (ToyyibPay)
+    if (formData.payment === "online") {
+      try {
+        const billRes = await axios.post(`${API_CONFIG.BASE_URL}/payment/create-bill`, {
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          // billAmount: total.toFixed(2),
+          billAmount: Math.round(total * 100),
+
+          billName: "Food Order Payment",
+          billDescription: "Online order payment",
+        });
+
+        const billCode = billRes.data[0]?.BillCode;
+
+        if (billCode) {
+          toast.success("Redirecting to ToyyibPay Sandbox...");
+          window.location.href = `https://dev.toyyibpay.com/${billCode}`;
+          return;
+        } else {
+          toast.error("Failed to create ToyyibPay bill!");
+        }
+      } catch (err) {
+        console.error("ToyyibPay error:", err);
+        toast.error("Payment error!");
+      }
+      return;
+    }
+
+    // ✅ Normal payment (cash/card)
     try {
       const res = await axios.post(
         `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.ORDER}`,
         payload
       );
-
       toast.success("✅ Order placed successfully!");
       console.log("Order Response:", res.data);
       clearCart();
@@ -142,34 +184,31 @@ export default function ContentCheckout() {
 
                 <div className="payment-methods">
                   {["dine-in", "delivery"].map((type) => (
-                    <div className="payment-method" key={type}>
+                    <label key={type} className={`payment-method ${formData.orderType === type ? "selected" : ""}`}>
                       <input
                         type="radio"
-                        id={type}
                         name="orderType"
                         value={type}
                         checked={formData.orderType === type}
-                        onChange={handleChange}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            orderType: e.target.value,
+                          }))
+                        }
                       />
-                      <label htmlFor={type}>
-                        <i
-                          className={`fas ${
-                            type === "dine-in"
-                              ? "fa-utensils"
-                              : "fa-truck"
-                          } payment-icon`}
-                        />
-                        <span>
-                          {type === "dine-in" ? "Dine-in" : "Delivery"}
-                        </span>
-                      </label>
-                    </div>
+                      <i
+                        className={`fas ${
+                          type === "dine-in" ? "fa-utensils" : "fa-truck"
+                        } payment-icon`}
+                      />
+                      <span>{type === "dine-in" ? "Dine-in" : "Delivery"}</span>
+                    </label>
                   ))}
                 </div>
               </div>
 
-
-              {/* ✅ Dine-in Info (only if dine-in) */}
+              {/* ✅ Dine-in Info */}
               {formData.orderType === "dine-in" && (
                 <div className="form-section">
                   <h2>
@@ -195,7 +234,7 @@ export default function ContentCheckout() {
                 </div>
               )}
 
-              {/* ✅ Delivery Info (only if delivery) */}
+              {/* ✅ Delivery Info */}
               {formData.orderType === "delivery" && (
                 <div className="form-section">
                   <h2>
@@ -215,7 +254,7 @@ export default function ContentCheckout() {
                 </div>
               )}
 
-              {/* Payment Method */}
+              {/* ✅ Payment Method */}
               <div className="form-section">
                 <h2>
                   <i className="fas fa-credit-card" /> Payment Method
@@ -254,7 +293,7 @@ export default function ContentCheckout() {
                 </div>
               </div>
 
-              {/* Submit */}
+              {/* ✅ Submit */}
               <div className="form-actions">
                 <button type="submit" className="place-order-btn">
                   <i className="fas fa-lock" /> Place Order
@@ -302,10 +341,12 @@ export default function ContentCheckout() {
                 </div>
               </div>
 
-              <div className="delivery-info">
-                <i className="fas fa-shipping-fast" />
-                <span>Estimated delivery: 30-45 minutes</span>
-              </div>
+              {formData.orderType === "delivery" && (
+                <div className="delivery-info">
+                  <i className="fas fa-shipping-fast" />
+                  <span>Estimated delivery: 30–45 minutes</span>
+                </div>
+              )}
             </div>
           </div>
         </div>

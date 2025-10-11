@@ -1,8 +1,20 @@
-import { Link } from "react-router-dom";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 
 
 
 export default function Content() {
+
+    const [selectedOption, setSelectedOption] = useState<string>(
+        localStorage.getItem("orderType") || "delivery"
+    );
+
+    const handleSelect = (option: "delivery" | "dine-in") => {
+    setSelectedOption(option);
+    localStorage.setItem("checkout_method", option); // ✅ Save to localStorage
+    };
+
+
     return (
         <>
             <main className="main-content">
@@ -18,27 +30,37 @@ export default function Content() {
                 <img src="https://img.freepik.com/free-psd/food-menu-restaurant-facebook-cover-banner-template_120329-4875.jpg?semt=ais_incoming&w=740&q=80" alt="Promo Banner" />
                 <button className="find-out">Find Out More</button>
             </section>
+
+
             {/* Delivery & Pickup */}
             <section className="options-compact">
-                <div className="compact-option active">
+            <div
+                className={`compact-option ${selectedOption === "delivery" ? "active" : ""}`}
+                onClick={() => handleSelect("delivery")}
+            >
                 <div className="compact-icon">
-                    <i className="fas fa-motorcycle" />
+                <i className="fas fa-motorcycle" />
                 </div>
                 <div className="compact-text">
-                    <span className="compact-title">Delivery</span>
-                    <span className="compact-details">30-45 min</span>
+                <span className="compact-title">Delivery</span>
+                <span className="compact-details">30-45 min</span>
                 </div>
-                </div>
-                <div className="compact-option">
+            </div>
+
+            <div
+                className={`compact-option ${selectedOption === "dine-in" ? "active" : ""}`}
+                onClick={() => handleSelect("dine-in")}
+            >
                 <div className="compact-icon">
-                    <i className="fas fa-store" />
+                <i className="fas fa-store" />
                 </div>
                 <div className="compact-text">
-                    <span className="compact-title">Pickup</span>
-                    <span className="compact-details">15-20 min</span>
+                <span className="compact-title">Dine-in</span>
+                <span className="compact-details">15-20 min</span>
                 </div>
-                </div>
+            </div>
             </section>
+
 
            
 

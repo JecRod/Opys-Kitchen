@@ -2832,7 +2832,7 @@ Home Section
     /* Fixed input area */
     .chatbot-input {
         position: fixed;
-        bottom: 0px; /* Position above mobile nav */
+        bottom: 45px; /* Position above mobile nav */
         left: 0;
         right: 0;
         background: white;
@@ -2906,7 +2906,7 @@ Home Section
     
     .suggestions {
         padding: 10px;
-        bottom: 70px;
+        bottom: 110px;
     }
     
     .suggestion-buttons {
