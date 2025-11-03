@@ -33,11 +33,13 @@ export default function ContentHall() {
     specialRequests: "",
   });
 
-  // ✅ Fetch halls from API
+  // ✅ Fetch halls
   useEffect(() => {
     const fetchHalls = async () => {
       try {
-        const res = await axios.get(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.HALLS}`);
+        const res = await axios.get(
+          `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.HALLS}`
+        );
         setHalls(res.data.data || []);
       } catch (err: any) {
         console.error("Error fetching halls:", err);
@@ -49,13 +51,15 @@ export default function ContentHall() {
     fetchHalls();
   }, []);
 
-  // ✅ Generic change handler
-  const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  // ✅ Handle form changes
+  const handleChange = (
+    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // ✅ Submit booking
+  // ✅ Submit hall booking with online payment (ToyyibPay)
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
@@ -64,27 +68,73 @@ export default function ContentHall() {
       return;
     }
 
-    const payload = {
+    const selectedHall = halls.find(
+      (hall) => hall.id === parseInt(formData.hallSelection)
+    );
+    if (!selectedHall) {
+      toast.error("Invalid hall selected!");
+      return;
+    }
+
+    const total = parseFloat(selectedHall.price_per_day);
+
+    const orderPayload = {
       customer_name: formData.fullName,
       customer_email: formData.email,
       customer_phone: formData.phone,
       status: "pending",
       order_type: "hall",
-      table_no: null,
-      address: null,
-      hall_id: parseInt(formData.hallSelection), // ✅ numeric id
-      booking_hall_date: formData.eventDate, // ✅ correct key
-      special_request: formData.specialRequests, // ✅ match Laravel
+      hall_id: selectedHall.id,
+      booking_hall_date: formData.eventDate,
+      special_request: formData.specialRequests,
       items: [],
-      special_requests: formData.specialRequests,
     };
 
     try {
-      const res = await axios.post(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.ORDER}`, payload);
-      toast.success("✅ Hall booked successfully!");
-      console.log("Booking Response:", res.data);
+      // ✅ Step 1: Create hall booking order
+      const orderRes = await axios.post(
+        `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.ORDER}`,
+        orderPayload
+      );
 
-      // Reset form
+      const order = orderRes.data.order || orderRes.data;
+      console.log("✅ Hall Order Created:", order);
+      toast.success("✅ Hall booked successfully!");
+
+      // ✅ Step 2: Create ToyyibPay bill
+      const billRes = await axios.post(
+        `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.PAYMENT}`,
+        {
+          order_id: order.id || order.order_id,
+          total_price: total,
+          payment_method: "online",
+          name: formData.fullName,
+          status: "pending",
+          email: formData.email,
+          phone: formData.phone,
+          billName: "Hall Booking",
+          billDescription: `Payment for hall booking #${order.id}`,
+        }
+      );
+
+      console.log("💳 ToyyibPay Response:", billRes.data);
+
+      // ✅ Step 3: Redirect to ToyyibPay
+      const paymentUrl =
+        billRes.data.billCode
+          ? `https://dev.toyyibpay.com/${billRes.data.billCode}`
+          : billRes.data.url ||
+            billRes.data.redirect ||
+            billRes.data.payment_url;
+
+      if (paymentUrl) {
+        toast.success("Redirecting to ToyyibPay...");
+        window.location.href = paymentUrl;
+      } else {
+        toast.error("❌ Failed to create ToyyibPay bill!");
+      }
+
+      // ✅ Step 4: Reset form
       setFormData({
         fullName: "",
         email: "",
@@ -94,11 +144,10 @@ export default function ContentHall() {
         hallSelection: "",
         specialRequests: "",
       });
-
       clearCart();
     } catch (err: any) {
-      console.error("Booking error:", err.response?.data || err.message);
-      toast.error("❌ Failed to book hall!");
+      console.error("❌ Online Booking Error:", err.response?.data || err.message);
+      toast.error("❌ Failed to book hall or process payment!");
     }
   };
 
@@ -112,7 +161,7 @@ export default function ContentHall() {
           <h1>Book Your Perfect Event Space</h1>
           <p>
             Find and reserve the ideal hall for your wedding, conference, or
-            special occasion with our easy booking system.
+            special occasion with our easy online booking system.
           </p>
         </div>
       </section>
@@ -156,7 +205,7 @@ export default function ContentHall() {
                     id="phone"
                     name="phone"
                     type="tel"
-                    placeholder="+1 (555) 123-4567"
+                    placeholder="+60 12-345 6789"
                     required
                     value={formData.phone}
                     onChange={handleChange}
@@ -176,7 +225,7 @@ export default function ContentHall() {
                 />
               </div>
 
-              {/* ✅ Dynamic hall dropdown */}
+              {/* ✅ Hall Selection */}
               <div className="form-hall-group-hall">
                 <label htmlFor="hallSelection">Select Hall *</label>
                 <select
@@ -189,7 +238,7 @@ export default function ContentHall() {
                   <option value="">Choose a hall</option>
                   {halls.map((hall) => (
                     <option key={hall.id} value={hall.id}>
-                      {hall.name}
+                      {hall.name} — RM {hall.price_per_day}/day
                     </option>
                   ))}
                 </select>
@@ -209,7 +258,7 @@ export default function ContentHall() {
 
               <div className="form-hall-actions">
                 <button type="submit" className="btn btn-primary">
-                  Book Now
+                  Pay & Book Online
                 </button>
                 <button
                   type="reset"
@@ -232,7 +281,7 @@ export default function ContentHall() {
             </form>
           </div>
 
-          {/* ✅ Hall Cards (limit 2) */}
+          {/* ✅ Hall Display (limit 2) */}
           <div className="hall-details">
             {halls.slice(0, 2).map((hall) => (
               <div className="hall-card" key={hall.id}>
@@ -259,11 +308,11 @@ export default function ContentHall() {
                       </div>
                     ))}
                   </div>
-                  <div className="hall-price">RM {hall.price_per_day} / day</div>
+                  <div className="hall-price">
+                    RM {hall.price_per_day} / day
+                  </div>
                   {!hall.is_available && (
-                    <div className="hall-unavailable">
-                      Currently unavailable
-                    </div>
+                    <div className="hall-unavailable">Currently unavailable</div>
                   )}
                 </div>
               </div>
@@ -271,7 +320,7 @@ export default function ContentHall() {
           </div>
         </div>
 
-        {/* ✅ Feature section */}
+        {/* ✅ Features Section */}
         <section className="feature-halls-section">
           <h2 className="section-title">Why Choose Our Halls</h2>
           <div className="feature-halls-grid">

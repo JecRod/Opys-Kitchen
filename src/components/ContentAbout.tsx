@@ -39,7 +39,7 @@ export default function ContentAbout() {
                     </div> */}
                     </div>
                     <div className="about-image">
-                    <img src="../public/assets/img/kedai.jpg" alt="Our Restaurant Kitchen" />
+                    <img src="/assets/img/kedai.jpg" alt="Our Restaurant Kitchen" />
                     </div>
                 </div>
                 </section>

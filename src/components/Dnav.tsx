@@ -8,7 +8,7 @@ export default function Dnav() {
             <nav className="desktop-nav">
             <div className="nav-left">
             <div className="logo">
-                <img src="../public/assets/img/logo.svg" alt="OpysKitchen Logo" />
+                <img src="/assets/img/logo.svg" alt="OpysKitchen Logo" />
                 {/* OpysKitchen */}
             </div>
             </div>

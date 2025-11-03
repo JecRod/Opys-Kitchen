@@ -2,43 +2,59 @@ import axios from "axios";
 import { API_CONFIG } from "../Api-Config";
 import { useCart } from "../context/CartContext";
 import toast from "react-hot-toast";
-import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
+
+import {
+  useEffect,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from "react";
 
 export default function ContentCheckout() {
   const { cartItems, clearCart } = useCart();
+  const navigate = useNavigate();
 
-  // ✅ Load checkout method (delivery / pickup) from localStorage
-  const [checkoutMethod, setCheckoutMethod] = useState<"delivery" | "dine-in" | null>(null);
 
+  // ✅ Checkout method (delivery / dine-in)
+  const [, setCheckoutMethod] = useState<"delivery" | "dine-in" | null>(null);
+
+
+  // ✅ Load checkout method from localStorage
   useEffect(() => {
-  const savedMethod = localStorage.getItem("checkout_method") as "delivery" | "dine-in" | null;
-  if (savedMethod) {
-    setCheckoutMethod(savedMethod);
-    setFormData((prev) => ({
-      ...prev,
-      orderType: savedMethod === "dine-in" ? "dine-in" : "delivery", // ✅ map pickup -> dine-in
-    }));
-  }
-}, []);
+    const savedMethod = localStorage.getItem("checkout_method") as
+      | "delivery"
+      | "dine-in"
+      | null;
+    if (savedMethod) {
+      setCheckoutMethod(savedMethod);
+      setFormData((prev) => ({
+        ...prev,
+        orderType: savedMethod,
+      }));
+    }
+  }, []);
 
-
-  // ✅ Form state
+  // ✅ Form data state
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     phone: "",
     tableNo: "",
     address: "",
-    payment: "cash",
+    payment: "cash", // default
     orderType: "dine-in", // default
   });
 
-  // ✅ Calculate totals
-  const subtotal = cartItems.reduce((total, item) => total + item.price * item.quantity, 0);
+  // ✅ Totals
+  const subtotal = cartItems.reduce(
+    (total, item) => total + item.price * item.quantity,
+    0
+  );
   const tax = subtotal * 0.06;
   const total = subtotal + tax;
 
-  // ✅ Handle input change
+  // ✅ Input change handler
   const handleChange = (
     e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
@@ -46,7 +62,7 @@ export default function ContentCheckout() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // ✅ Submit order
+  // ✅ Submit handler
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
@@ -55,14 +71,15 @@ export default function ContentCheckout() {
       return;
     }
 
-    // Build payload
-    const payload: any = {
+    // 🧾 Step 1: Build order payload
+    const orderPayload: any = {
       customer_name: formData.name,
       customer_email: formData.email,
       customer_phone: formData.phone,
       status: "pending",
       order_type: formData.orderType,
       payment_method: formData.payment,
+      total_price: total,
       items: cartItems.map((item) => ({
         item_id: item.id,
         quantity: item.quantity,
@@ -70,53 +87,94 @@ export default function ContentCheckout() {
     };
 
     if (formData.orderType === "dine-in") {
-      payload.table_no = formData.tableNo;
+      orderPayload.table_no = formData.tableNo;
     } else if (formData.orderType === "delivery") {
-      payload.address = formData.address;
+      orderPayload.address = formData.address;
     }
 
-    // ✅ Online payment flow (ToyyibPay)
-    if (formData.payment === "online") {
-      try {
-        const billRes = await axios.post(`${API_CONFIG.BASE_URL}/payment/create-bill`, {
-          name: formData.name,
-          email: formData.email,
-          phone: formData.phone,
-          // billAmount: total.toFixed(2),
-          billAmount: Math.round(total * 100),
+    try {
+      // ✅ Step 2: Create order
+      const orderRes = await axios.post(
+        `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.ORDER}`,
+        orderPayload
+      );
 
-          billName: "Food Order Payment",
-          billDescription: "Online order payment",
+      const order = orderRes.data.order || orderRes.data;
+      console.log("✅ Order Created:", order);
+
+      // ✅ Step 3: Handle payment based on method
+      if (formData.payment === "cash") {
+        try {
+          const cashRes = await axios.post(
+            `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.PAYMENT_CASH}`,
+            {
+              order_id: order.id || order.order_id,
+              total_price: total,
+              payment_method: "cash",
+              email: formData.email,
+            }
+          );
+
+          console.log("💵 Cash Payment Response:", cashRes.data);
+          toast.success("💵 Cash payment recorded successfully!");
+          clearCart();
+          navigate("/receipt", { 
+          state: { 
+            order: { 
+              ...order, 
+              total_price: total, 
+              items: cartItems // ✅ include full item details
+            } 
+          } 
         });
 
-        const billCode = billRes.data[0]?.BillCode;
 
-        if (billCode) {
-          toast.success("Redirecting to ToyyibPay Sandbox...");
-          window.location.href = `https://dev.toyyibpay.com/${billCode}`;
-          return;
-        } else {
-          toast.error("Failed to create ToyyibPay bill!");
+
+        } catch (cashError: any) {
+          console.error("❌ Cash Payment Error:", cashError.response?.data || cashError.message);
+          toast.error("❌ Failed to record cash payment!");
         }
-      } catch (err) {
-        console.error("ToyyibPay error:", err);
-        toast.error("Payment error!");
-      }
-      return;
-    }
+      } else if (formData.payment === "online") {
+        try {
+          const billRes = await axios.post(
+            `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.PAYMENT}`,
+            {
+              order_id: order.id || order.order_id,
+              total_price: total,
+              payment_method: "online",
+              name: formData.name,
+              status: "pending",
+              email: formData.email,
+              phone: formData.phone,
+              billName: "Burger Order",
+              billDescription: `Payment for order #${order.id}`,
+            }
+          );
 
-    // ✅ Normal payment (cash/card)
-    try {
-      const res = await axios.post(
-        `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.ORDER}`,
-        payload
-      );
-      toast.success("✅ Order placed successfully!");
-      console.log("Order Response:", res.data);
-      clearCart();
+          console.log("💳 ToyyibPay Response:", billRes.data);
+          const paymentUrl =
+            billRes.data.billCode
+              ? `https://dev.toyyibpay.com/${billRes.data.billCode}`
+              : billRes.data.url ||
+                billRes.data.redirect ||
+                billRes.data.payment_url;
+
+          if (paymentUrl) {
+            toast.success("Redirecting to ToyyibPay...");
+            window.location.href = paymentUrl;
+          } else {
+            toast.error("❌ Failed to create ToyyibPay bill!");
+          }
+        } catch (onlineError: any) {
+          console.error("❌ Online Payment Error:", onlineError.response?.data || onlineError.message);
+          toast.error("❌ Online payment failed!");
+        }
+      } else if (formData.payment === "card") {
+        toast("💳 Card payment feature coming soon!");
+      }
     } catch (error: any) {
-      console.error("Order error:", error.response?.data || error.message);
-      toast.error("❌ Failed to place order!");
+      console.error("❌ Checkout Error:", error.response?.data || error.message);
+      toast.error("Failed to process your order!");
     }
   };
 
@@ -125,7 +183,7 @@ export default function ContentCheckout() {
       <div className="container">
         <section className="greeting">
           <h2>Proceed to Checkout</h2>
-          <p>Review your items before checkout</p>
+          <p>Review your items before confirming your order</p>
         </section>
       </div>
 
@@ -136,9 +194,7 @@ export default function ContentCheckout() {
             <form id="checkout-form" className="checkout-form" onSubmit={handleSubmit}>
               {/* Customer Info */}
               <div className="form-section">
-                <h2>
-                  <i className="fas fa-user" /> Customer Information
-                </h2>
+                <h2><i className="fas fa-user" /> Customer Information</h2>
                 <div className="form-row">
                   <div className="form-group">
                     <label htmlFor="name">Full Name *</label>
@@ -176,15 +232,15 @@ export default function ContentCheckout() {
                 </div>
               </div>
 
-              {/* ✅ Order Type */}
+              {/* Order Type */}
               <div className="form-section">
-                <h2>
-                  <i className="fas fa-concierge-bell" /> Order Type
-                </h2>
-
+                <h2><i className="fas fa-concierge-bell" /> Order Type</h2>
                 <div className="payment-methods">
                   {["dine-in", "delivery"].map((type) => (
-                    <label key={type} className={`payment-method ${formData.orderType === type ? "selected" : ""}`}>
+                    <label
+                      key={type}
+                      className={`payment-method ${formData.orderType === type ? "selected" : ""}`}
+                    >
                       <input
                         type="radio"
                         name="orderType"
@@ -208,12 +264,10 @@ export default function ContentCheckout() {
                 </div>
               </div>
 
-              {/* ✅ Dine-in Info */}
+              {/* Dine-in Info */}
               {formData.orderType === "dine-in" && (
                 <div className="form-section">
-                  <h2>
-                    <i className="fas fa-utensils" /> Dine-in Information
-                  </h2>
+                  <h2><i className="fas fa-utensils" /> Dine-in Information</h2>
                   <div className="form-group">
                     <label htmlFor="tableNo">Table No *</label>
                     <select
@@ -224,22 +278,20 @@ export default function ContentCheckout() {
                       onChange={handleChange}
                     >
                       <option value="">Select a table</option>
-                      <option value="1">Table 1</option>
-                      <option value="2">Table 2</option>
-                      <option value="3">Table 3</option>
-                      <option value="4">Table 4</option>
-                      <option value="5">Table 5</option>
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <option key={n} value={n}>
+                          Table {n}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 </div>
               )}
 
-              {/* ✅ Delivery Info */}
+              {/* Delivery Info */}
               {formData.orderType === "delivery" && (
                 <div className="form-section">
-                  <h2>
-                    <i className="fas fa-truck" /> Delivery Information
-                  </h2>
+                  <h2><i className="fas fa-truck" /> Delivery Information</h2>
                   <div className="form-group">
                     <label htmlFor="address">Delivery Address *</label>
                     <textarea
@@ -254,14 +306,15 @@ export default function ContentCheckout() {
                 </div>
               )}
 
-              {/* ✅ Payment Method */}
+              {/* Payment Method */}
               <div className="form-section">
-                <h2>
-                  <i className="fas fa-credit-card" /> Payment Method
-                </h2>
+                <h2><i className="fas fa-credit-card" /> Payment Method</h2>
                 <div className="payment-methods">
                   {["cash", "card", "online"].map((method) => (
-                    <div className="payment-method" key={method}>
+                    <label
+                      key={method}
+                      className={`payment-method ${formData.payment === method ? "selected" : ""}`}
+                    >
                       <input
                         type="radio"
                         id={method}
@@ -270,30 +323,28 @@ export default function ContentCheckout() {
                         checked={formData.payment === method}
                         onChange={handleChange}
                       />
-                      <label htmlFor={method}>
-                        <i
-                          className={`fas ${
-                            method === "cash"
-                              ? "fa-money-bill-wave"
-                              : method === "card"
-                              ? "fa-credit-card"
-                              : "fa-mobile-alt"
-                          } payment-icon`}
-                        />
-                        <span>
-                          {method === "cash"
-                            ? "Cash on Delivery"
+                      <i
+                        className={`fas ${
+                          method === "cash"
+                            ? "fa-money-bill-wave"
                             : method === "card"
-                            ? "Credit/Debit Card"
-                            : "Online Payment"}
-                        </span>
-                      </label>
-                    </div>
+                            ? "fa-credit-card"
+                            : "fa-mobile-alt"
+                        } payment-icon`}
+                      />
+                      <span>
+                        {method === "cash"
+                          ? "Cash on Delivery"
+                          : method === "card"
+                          ? "Credit/Debit Card"
+                          : "Online Payment"}
+                      </span>
+                    </label>
                   ))}
                 </div>
               </div>
 
-              {/* ✅ Submit */}
+              {/* Submit */}
               <div className="form-actions">
                 <button type="submit" className="place-order-btn">
                   <i className="fas fa-lock" /> Place Order
@@ -305,7 +356,7 @@ export default function ContentCheckout() {
             </form>
           </div>
 
-          {/* ✅ Cart Summary */}
+          {/* ✅ Order Summary */}
           <div className="order-summary-section">
             <div className="order-summary-card">
               <h2>Order Summary</h2>

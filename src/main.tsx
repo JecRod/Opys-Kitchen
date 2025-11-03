@@ -14,10 +14,20 @@ import OfferPage from './pages/OfferPage.tsx';
 import CheckoutPage from './pages/CheckoutPage.tsx';
 import HallPage from './pages/HallPage.tsx';
 import { CartProvider } from "./context/CartContext";
+import ReceiptPage from './pages/ReceiptPage.tsx';
+import FeedbackPage from './pages/FeedbackPage.tsx';
 
 
 
 const router = createBrowserRouter([
+  {
+    path: "/receipt",
+    element: <ReceiptPage />,
+  },
+  // {
+  //       path: "feedback",
+  //       element: <FeedbackPage />,
+  // },
   {
     path: "/",
     element: <Layout />,
@@ -55,6 +65,11 @@ const router = createBrowserRouter([
         path: "hall",
         element: <HallPage />,
       },
+        {
+        path: "feedback",
+        element: <FeedbackPage />,
+  },
+      
       
     ],
   },
