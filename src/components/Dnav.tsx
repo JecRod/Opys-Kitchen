@@ -1,8 +1,13 @@
 import { Link } from "react-router-dom";
+import { useCart } from "../context/CartContext";
 
 
 
 export default function Dnav() {
+
+    const { cartItems } = useCart();
+    const totalItems = cartItems.reduce((total, item) => total + item.quantity, 0);
+
     return (
         <>
             <nav className="desktop-nav">
@@ -27,8 +32,12 @@ export default function Dnav() {
                 <i className="fas fa-search" />
                 </div>
                 <div className="nav-icon cart-icon">
-                    <Link to="/cart"><i className="fas fa-shopping-cart" /><span className="cart-count">3</span></Link>
+                <Link to="/cart">
+                    <i className="fas fa-shopping-cart" />
+                    {totalItems > 0 && <span className="cart-count">{totalItems}</span>}
+                </Link>
                 </div>
+
                 <div className="nav-icon user-icon">
                     <Link to="/chat"><i className="fas fa-message" /></Link>
                 

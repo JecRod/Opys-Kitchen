@@ -24,6 +24,8 @@ interface Offer {
   items?: OfferItem[];
 }
 
+
+
 export default function ContentOffer() {
   const [offers, setOffers] = useState<Offer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,6 +48,24 @@ export default function ContentOffer() {
     };
     fetchOffers();
   }, []);
+
+  const calculateOfferPrice = (offer: Offer) => {
+    if (!offer.items || offer.items.length === 0) return 0;
+
+    // 1) Sum all item prices
+    const totalPrice = offer.items.reduce((sum, item) => sum + item.price, 0);
+
+    // 2) If discount_label exists (ex: "20%")
+    if (offer.discount_label && offer.discount_label.includes("%")) {
+      const discount = parseFloat(offer.discount_label.replace("%", "")); // 20
+      const discountAmount = (totalPrice * discount) / 100;
+      return totalPrice - discountAmount;
+    }
+
+    // No discount → return total price
+    return totalPrice;
+  };
+
 
   if (loading) return <p>Loading offers...</p>;
   if (error) return <p>{error}</p>;
@@ -87,7 +107,7 @@ export default function ContentOffer() {
                     {offer.subtitle && <p>{offer.subtitle}</p>}
                   </div>
                   {offer.discount_label && (
-                    <div className="offer-discount">{offer.discount_label}OFF</div>
+                    <div className="offer-discount">{offer.discount_label} OFF</div>
                   )}
                 </div>
 
@@ -95,7 +115,7 @@ export default function ContentOffer() {
                   <p className="offer-description">{offer.description}</p>
                 )}
 
-                {/* Safe check for features */}
+                {/* Features */}
                 {Array.isArray(offer.features) && offer.features.length > 0 && (
                   <ul className="offer-features">
                     {offer.features.map((feature, idx) => (
@@ -106,26 +126,41 @@ export default function ContentOffer() {
                   </ul>
                 )}
 
-                {/* Add all offer items to cart */}
+                {/* ✅ Offer Item Details */}
+                {Array.isArray(offer.items) && offer.items.length > 0 && (
+                  <div className="offer-items">
+                    <h4>Items Included</h4>
+                    <ul className="offer-item-list">
+                      {offer.items.map((item, index) => (
+                        <li key={index}>
+                          {item.name} — RM {item.price}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
                 <div className="offer-actions">
                   <button
                     className="btn-primary"
                     onClick={() => {
-                      if (Array.isArray(offer.items) && offer.items.length > 0) {
-                        offer.items.forEach((item) => {
-                          addToCart({
-                            id: item.id,
-                            name: item.name,
-                            price: item.price,
-                            image: item.image || "",
-                            description: item.description || "",
-                            quantity: 1,
-                          });
-                        });
-                        toast.success(`${offer.title} added to cart!`);
-                      } else {
+                      if (!offer.items || offer.items.length === 0) {
                         toast.error("No items in this offer");
+                        return;
                       }
+
+                      const finalPrice = calculateOfferPrice(offer);
+
+                      addToCart({
+                        id: 100000 + offer.id, // ✅ unique id for offer
+                        name: offer.title,
+                        price: finalPrice,
+                        image: offer.image || "",
+                        description: offer.description || "",
+                        quantity: 1,
+                      });
+
+                      toast.success(`${offer.title} added to cart (RM ${finalPrice.toFixed(2)})`);
                     }}
                   >
                     Add to Cart
@@ -145,6 +180,7 @@ export default function ContentOffer() {
                   </button>
                 </div>
               </div>
+
             </div>
           ))}
         </div>
@@ -200,27 +236,7 @@ export default function ContentOffer() {
           </div>
         </section>
 
-        {/* Promo Code Section */}
-        <section className="promo-section">
-          <h2>Exclusive Promo Code</h2>
-          <p>Use this special code for an extra discount on your next order</p>
-          <div className="promo-code">
-            <div className="code">FOODIE25</div>
-          </div>
-          <p>
-            <small>
-              Valid for new customers only. Minimum order $30. Expires in 7
-              days.
-            </small>
-          </p>
-          <a
-            href="menu.html"
-            className="btn-primary"
-            style={{ background: "white", color: "#667eea" }}
-          >
-            Use This Code
-          </a>
-        </section>
+        
       </div>
     </main>
   );

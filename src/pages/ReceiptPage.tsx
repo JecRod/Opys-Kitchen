@@ -1,4 +1,7 @@
 import { useLocation, Link } from "react-router-dom";
+import { API_CONFIG } from "../Api-Config";
+import axios from "axios";
+import toast from "react-hot-toast";
 
 export default function ReceiptPage() {
   const location = useLocation();
@@ -144,8 +147,7 @@ export default function ReceiptPage() {
               to="/feedback"
               state={{
                 item_id: order.items[0].item_id,
-                item_name:
-                  order.items[0].name || order.items[0].item_name || "Item",
+                item_name: order.items[0].name || order.items[0].item_name || "Item",
               }}
               style={{
                 textDecoration: "none",
@@ -158,7 +160,40 @@ export default function ReceiptPage() {
               ⭐ Send Feedback
             </Link>
           )}
+
+          {/* ✅ Add Order Received Button */}
+          <button
+            onClick={async () => {
+              // Make a request to update the order status to 'received'
+              try {
+                const res = await axios.put(
+                  `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.UPDATE_ORDER}/${order.id}`,
+                  { status: "received" }
+                );
+                
+                if (res.data.success) {
+                  toast.success("Order status updated to 'Received'");
+                } else {
+                  toast.error("Failed to update the order status.");
+                }
+              } catch (err) {
+                console.error("Error updating order status:", err);
+                toast.error("Something went wrong, please try again.");
+              }
+            }}
+            style={{
+              background: "#ffcc00", // Yellow background for "Order Received" button
+              color: "white",
+              padding: "10px 20px",
+              borderRadius: "8px",
+              cursor: "pointer",
+              border: "none",
+            }}
+          >
+            ✅ Order Received
+          </button>
         </div>
+
       </div>
     </div>
   );

@@ -218,10 +218,10 @@ export default function Content() {
                       </div>
 
                       <div className="hall-actions">
-                        <Link to={`/hall/${hall.id}`} className="view-details-btn">
+                        <Link to="/hall" className="view-details-btn">
                           View Details
                         </Link>
-                        <Link to={`/hall/${hall.id}`} className="check-availability-btn">
+                        <Link to="/hall" className="check-availability-btn">
                           Check Availability
                         </Link>
                       </div>

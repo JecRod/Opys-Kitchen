@@ -50,6 +50,14 @@ export default function ContentMenu() {
             item.category.toLowerCase() === selectedCategory.toLowerCase()
         );
 
+
+  const sortedMenu = [...filteredMenu].sort((a, b) => {
+      // Put drinks at the bottom
+      if (a.category === "drink" && b.category !== "drink") return 1;
+      if (a.category !== "drink" && b.category === "drink") return -1;
+      return 0;
+    });
+
   if (loading) return <p>Loading menu...</p>;
 
 
@@ -64,7 +72,7 @@ export default function ContentMenu() {
         {/* ✅ Category Filter */}
         <section className="item">
           <ul>
-            {["all", "rice", "burger", "dessert", "beverage"].map((cat) => (
+            {["all", "rice", "burger", "dessert", "drinks"].map((cat) => (
               <li key={cat}>
                 <a
                   href="#"
@@ -83,63 +91,68 @@ export default function ContentMenu() {
 
         {/* ✅ Dynamic Menu Items */}
         <section className="menu-section">
-          <div className="container">
-            <h2 className="section-title">
-              {selectedCategory === "all"
-                ? "All Menu Items"
-                : `${selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)} Menu`}
-            </h2>
+        <div className="container">
+          <h2 className="section-title">
+            {selectedCategory === "all"
+              ? "All Menu Items"
+              : `${selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)} Menu`}
+          </h2>
 
-            <div className="menu-grid">
-              {filteredMenu.length > 0 ? (
-                filteredMenu.map((item) => (
-                  <div key={item.id} className="menu-item">
-                    <img src={item.image} alt={item.name} />
-                    <div className="menu-item-content">
-                      <h3>{item.name}</h3>
-                      <p>{item.description}</p>
-                      <div className="price">RM {item.price.toFixed(2)}</div>
-                      {item.is_available === 1 ? (
-                        <button
-                        className="add-to-cart"
-                        onClick={() => {
-                          addToCart({
-                            id: item.id,
-                            name: item.name,
-                            price: item.price,
-                            description: item.description,
-                            image: item.image,
-                            quantity: 1,
-                          });
+          {(() => {
+            const sortedMenu = [...filteredMenu].sort((a, b) => {
+              if (a.category === "Drinks" && b.category !== "Drinks") return 1;
+              if (a.category !== "Drinks" && b.category === "Drinks") return -1;
+              return 0;
+            });
 
-                          // ✅ Show success toast
-                          toast.success(`${item.name} added to cart! 🛒`);
-                        }}
-                      >
-                        Add to Cart
-                      </button>
-
-                    ) : (
-                      <button
-                        className="not-available-cart"
-                        onClick={() => {
-                          toast.error(`${item.name} is not available!`);
-                        }}
-
-                      >
-                        Not Available
-                      </button>
-
-                      )}
+            return (
+              <div className="menu-grid">
+                {sortedMenu.length > 0 ? (
+                  sortedMenu.map((item) => (
+                    <div key={item.id} className="menu-item">
+                      <img src={item.image} alt={item.name} />
+                      <div className="menu-item-content">
+                        <h3>{item.name}</h3>
+                        <p>{item.description}</p>
+                        <div className="price">RM {item.price.toFixed(2)}</div>
+                        
+                        {item.is_available === 1 ? (
+                          <button
+                            className="add-to-cart"
+                            onClick={() => {
+                              addToCart({
+                                id: item.id,
+                                name: item.name,
+                                price: item.price,
+                                description: item.description,
+                                image: item.image,
+                                quantity: 1,
+                              });
+                              toast.success(`${item.name} added to cart! 🛒`);
+                            }}
+                          >
+                            Add to Cart
+                          </button>
+                        ) : (
+                          <button
+                            className="not-available-cart"
+                            onClick={() => toast.error(`${item.name} is not available!`)}
+                          >
+                            Not Available
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))
-              ) : (
-                <p>No items found in this category.</p>
-              )}
-            </div>
-          </div>
-        </section>
+                  ))
+                ) : (
+                  <p>No items found in this category.</p>
+                )}
+              </div>
+            );
+          })()}
+        </div>
+      </section>
+
       </div>
     </main>
   );

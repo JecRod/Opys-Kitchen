@@ -1,6 +1,8 @@
 import { useCart } from "../context/CartContext";
 import { Link } from "react-router-dom";
 
+
+
 export default function ContentCart() {
   const { cartItems, removeFromCart, increaseQty, decreaseQty } = useCart();
 

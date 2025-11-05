@@ -10,6 +10,7 @@ export const API_CONFIG = {
         PAYMENT: '/payments',
         PAYMENT_CASH: '/payments/cash',
         FEEDBACK: '/feedback',
+        UPDATE_ORDER: '/chat',
 
 
     }

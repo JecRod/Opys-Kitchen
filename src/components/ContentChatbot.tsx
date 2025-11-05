@@ -17,7 +17,7 @@ export default function ContentChatbot() {
       id: messageId++,
       text: "Hello! I'm your FoodOrder assistant. How can I help you today?",
       sender: "bot",
-      quickActions: ["Track my order", "Menu suggestions", "Delivery time"],
+      quickActions: ["Track my order", "Menu suggestions", "Delivery time", "Cancel order", "Update order status"],
     },
   ]);
   const [input, setInput] = useState("");
@@ -38,22 +38,55 @@ export default function ContentChatbot() {
 
     try {
       let botReply = "";
+      const lowerText = text.toLowerCase();
 
-      // ✅ Use offers API if message is about offers/menu
-      if (text.toLowerCase().includes("menu") || text.toLowerCase().includes("offer")) {
+      // 🔹 1️⃣ Detect "update order" pattern
+      const match = lowerText.match(/update order (\d+)\s+(?:to|status)\s+(\w+)/);
+      if (match) {
+        const orderId = match[1];
+        const newStatus = match[2];
+
+        try {
+          const res = await axios.put(`${API_CONFIG.BASE_URL}/chat/${orderId}`, {
+            status: newStatus,
+          });
+
+          botReply = `✅ ${res.data.message}\nOrder #${orderId} is now *${newStatus.toUpperCase()}*.`;
+        } catch (err: any) {
+          if (err.response?.status === 404) {
+            botReply = `⚠️ Order with ID #${orderId} not found.`;
+          } else if (err.response?.data?.message) {
+            botReply = `⚠️ ${err.response.data.message}`;
+          } else {
+            botReply = `❌ Failed to update order #${orderId}.`;
+          }
+        }
+      }
+
+      // 🔹 2️⃣ Detect "track order" or "status" request
+      else if (lowerText.includes("track") || lowerText.includes("status of")) {
+        botReply = "Sure! Please provide your Order ID (e.g., Track 123).";
+      }
+
+      // 🔹 3️⃣ Detect menu or offer request
+      else if (lowerText.includes("menu") || lowerText.includes("offer")) {
         const res = await axios.get(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.OFFERS}`);
         const offers = res.data.offers || [];
         if (offers.length === 0) {
-          botReply = "Sorry, no offers available right now.";
+          botReply = "Sorry, no offers are available right now.";
         } else {
           botReply =
-            "Here are some current offers:\n" +
+            "Here are our current offers:\n" +
             offers
-              .map((o: any) => `• ${o.title}${o.discount_label ? ` - ${o.discount_label}` : ""}`)
+              .map(
+                (o: any) => `• ${o.title}${o.discount_label ? ` - ${o.discount_label}` : ""}`
+              )
               .join("\n");
         }
-      } else {
-        // 🔹 Default: send to auto-reply API
+      }
+
+      // 🔹 4️⃣ Default: send to AI auto-reply API
+      else {
         const res = await axios.post(
           `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.BOT}`,
           { message: text }
@@ -61,6 +94,7 @@ export default function ContentChatbot() {
         botReply = res.data.bot_reply || "🤖 Sorry, I don’t understand.";
       }
 
+      // 🔹 Send bot reply
       const botMessage: Message = { id: messageId++, text: botReply, sender: "bot" };
       setMessages((prev) => [...prev, botMessage]);
     } catch (err) {
@@ -105,7 +139,11 @@ export default function ContentChatbot() {
                   {msg.quickActions && (
                     <div className="quick-actions">
                       {msg.quickActions.map((action, idx) => (
-                        <button key={idx} className="quick-action" onClick={() => handleQuickAction(action)}>
+                        <button
+                          key={idx}
+                          className="quick-action"
+                          onClick={() => handleQuickAction(action)}
+                        >
                           {action}
                         </button>
                       ))}
@@ -123,22 +161,25 @@ export default function ContentChatbot() {
             <div ref={messagesEndRef} />
           </div>
 
-            <div className="suggestions">
+          {/* <div className="suggestions">
             <h3>Quick questions:</h3>
             <div className="suggestion-buttons">
-                {[
-                `What's today's special?`,
-                'Are there any ongoing offers?',
-                'How do I apply a promo code?',
-                'What are your delivery areas?',
-                ].map((text, idx) => (
-                <button key={idx} className="suggestion-btn" onClick={() => handleQuickAction(text)}>
-                    {text}
+              {[
+                "What's today's special?",
+                "Are there any ongoing offers?",
+                "How do I apply a promo code?",
+                "What are your delivery areas?",
+              ].map((text, idx) => (
+                <button
+                  key={idx}
+                  className="suggestion-btn"
+                  onClick={() => handleQuickAction(text)}
+                >
+                  {text}
                 </button>
-                ))}
+              ))}
             </div>
-            </div>
-
+          </div> */}
 
           <div className="chatbot-input">
             <input
